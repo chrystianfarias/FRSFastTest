@@ -1,0 +1,144 @@
+FRSFastBoot -- tracks for Mode=dev
+==================================
+
+Set these lines in FRSFastBoot.ini -- for a drag race on City Drag #1:
+
+    Mode=dev
+    DevTrack=4201
+    DevRaceType=4
+
+DevRaceType has to be the track's own:
+
+    0  circuit (also speedway, SUV races and free roam)
+    1  sprint
+    2  street X
+    4  drag
+    5  drift
+
+The types below are the ones the career's own races use on each track; where
+no career race uses a track, the type is guessed from its family and name,
+and the line says so.
+
+Mode=dev loads no save: a default car and no money. Races start with the
+developers' defaults for opponents and laps, which cannot be set yet.
+
+Taken from the game's own track list (GLOBAL\GLOBALB.BUN, chunk 0x34201).
+
+Track  Region  DevRaceType  Name
+-----  ------  -----------  ------------------------------
+4000   L4RA    0 circuit    Free roam (the whole city)
+4001   L4RA    0 circuit    CC Outer Loop #1
+4002   L4RA    0 circuit    City Loop #2
+4003   L4RA    0 circuit    NW Loop #1
+4004   L4RA    0 circuit    Stad/RS Loop
+4005   L4RA    0 circuit    High Speed F8
+4006   L4RA    0 circuit    SW Loop
+4011   L4RA    0 circuit    Short Circuit #1
+4012   L4RA    0 circuit    Short Circuit #2
+4013   L4RA    0 circuit    Short Circuit #3
+4014   L4RA    0 circuit    Short Circuit #4
+4015   L4RA    0 circuit    Short Circuit #5
+4021   L4RA    0 circuit    Upper Class #1
+4022   L4RA    0 circuit    Upper Class #2
+4023   L4RA    0 circuit    Upper Class #3
+4024   L4RA    0 circuit    Park Loop
+4041   L4RA    0 circuit    Industrial #1
+4042   L4RA    0 circuit    Industrial #2
+4043   L4RA    0 circuit    Industrial #3
+4044   L4RA    0 circuit    Ind Circuit #5
+4045   L4RA    0 circuit    Ind Circuit #7
+4061   L4RA    0 circuit    Suburban Hills #1
+4062   L4RA    0 circuit    Suburban Hills #2
+4063   L4RA    0 circuit    Suburban Hills #3
+4081   L4RA    0 circuit    UC-CC Circuit #1
+4082   L4RA    0 circuit    UC-CC Circuit #2
+4083   L4RA    0 circuit    UC-CC Circuit #3
+4084   L4RA    0 circuit    UC-CC Circuit #4
+4085   L4RA    0 circuit    CC-IND Circuit #1
+4086   L4RA    0 circuit    CC-IND Circuit #2
+4087   L4RA    0 circuit    CC-IND Circuit #3
+4088   L4RA    0 circuit    CC-IND Circuit #4
+4090   L4RA    -            XBL Outrun #1                          (outrun: not a race this path sets up; may not work)
+4091   L4RA    -            XBL Outrun #2                          (outrun: not a race this path sets up; may not work)
+4092   L4RA    -            XBL Outrun #3                          (outrun: not a race this path sets up; may not work)
+4093   L4RA    -            XBL Outrun #4                          (outrun: not a race this path sets up; may not work)
+4094   L4RA    -            XBL Outrun #5                          (outrun: not a race this path sets up; may not work)
+4095   L4RA    -            XBL Outrun #6                          (outrun: not a race this path sets up; may not work)
+4096   L4RA    -            XBL Outrun #7                          (outrun: not a race this path sets up; may not work)
+4097   L4RA    -            XBL Outrun #8                          (outrun: not a race this path sets up; may not work)
+4098   L4RA    -            XBL Outrun #9                          (outrun: not a race this path sets up; may not work)
+4099   L4RA    -            XBL Outrun #10                         (outrun: not a race this path sets up; may not work)
+4101   L4RA    1 sprint     City Sprint #1
+4102   L4RA    1 sprint     City Sprint #2
+4103   L4RA    1 sprint     City Sprint #3
+4104   L4RA    1 sprint     Highway Sprint
+4105   L4RA    1 sprint     SH-CC Sprint #1
+4106   L4RA    1 sprint     SH-CC Sprint #2
+4107   L4RA    1 sprint     SH-IND Sprint #1
+4121   L4RA    1 sprint     UC Sprint #1
+4122   L4RA    1 sprint     UC Sprint #2
+4123   L4RA    1 sprint     UC-CC Sprint #1
+4124   L4RA    1 sprint     UC-CC Sprint #2
+4125   L4RA    1 sprint     UC-CC Sprint #3
+4126   L4RA    1 sprint     UC-IND Sprint #1
+4127   L4RA    1 sprint     UC-IND Sprint #2
+4141   L4RA    1 sprint     IND Sprint #1
+4142   L4RA    1 sprint     IND Sprint #2
+4143   L4RA    1 sprint     IND Sprint #3
+4144   L4RA    1 sprint     IND-CC Sprint #1
+4145   L4RA    1 sprint     IND-CC Sprint #2
+4161   L4RA    1 sprint     SH Sprint #1
+4162   L4RA    1 sprint     SH Sprint #2
+4163   L4RA    1 sprint     SH-UC Sprint #1
+4164   L4RA    1 sprint     SH-UC Sprint #2
+4174   L4RA    5 drift      SH Drift Easy #1
+4175   L4RA    5 drift      SH Drift Easy #2
+4176   L4RA    5 drift      SH Drift Medium #1
+4177   L4RA    5 drift      SH Drift Medium #2
+4178   L4RA    5 drift      SH Drift Hard #1
+4179   L4RA    5 drift      SH Drift Hard #2
+4201   L4RB    4 drag       City Drag #1
+4211   L4RB    4 drag       Industrial Drag #1
+4212   L4RB    4 drag       Industrial Drag #2
+4213   L4RB    4 drag       Industrial Drag #3
+4221   L4RB    4 drag       Airport Drag #1
+4222   L4RB    4 drag       Airport Drag #2
+4223   L4RB    4 drag       Airport Drag #3
+4301   L4RC    5 drift      Vacant Lot Drift #1
+4302   L4RC    5 drift      Vacant Lot Drift #2
+4303   L4RC    5 drift      Vacant Lot Drift #3
+4304   L4RC    5 drift      Vacant Lot Drift #4
+4305   L4RC    5 drift      Vacant Lot Drift #5
+4306   L4RC    5 drift      Vacant Lot Drift #6
+4311   L4RC    5 drift      Stadium Drift #1
+4312   L4RC    5 drift      Stadium Drift #2
+4313   L4RC    5 drift      Stadium Drift #3
+4314   L4RC    5 drift      Stadium Drift #4
+4315   L4RC    5 drift      Stadium Drift #5
+4401   L4RD    4 drag       Organic Drag #1
+4402   L4RD    4 drag       Organic Drag #2
+4404   L4RD    4 drag       Organic Drag #4
+4601   L4RF    2 street X   Street X City 1
+4602   L4RF    2 street X   Street X City 2
+4603   L4RF    2 street X   Street X City 3
+4604   L4RF    2 street X   Street X City 4
+4605   L4RF    2 street X   Street X Industrial 1
+4606   L4RF    2 street X   Street X Industrial 2
+4607   L4RF    2 street X   Street X Industrial 3
+4608   L4RF    2 street X   Street X Industrial 4
+4701   L4RG    0 circuit    Speedway Industrial #1
+4702   L4RG    0 circuit    Speedway Industrial #2
+4703   L4RG    0 circuit    Speedway Industrial #3
+4704   L4RG    0 circuit    Speedway Industrial #4
+4705   L4RG    0 circuit    Speedway Industrial #5                 (type guessed: no career race uses this track)
+4706   L4RG    -            Speedway Dyno Testing                  (tuning track, not a race: may not work)
+4707   L4RG    -            SW Circuit/URL Tune                    (tuning track, not a race: may not work)
+4708   L4RG    -            SW Drift/StreetX Tune                  (tuning track, not a race: may not work)
+4709   L4RG    -            SW Drag Tune                           (tuning track, not a race: may not work)
+4711   L4RG    0 circuit    Speedway Airport #1                    (type guessed: no career race uses this track)
+4712   L4RG    0 circuit    Speedway Airport #2
+4713   L4RG    0 circuit    Speedway Airport #3
+4714   L4RG    0 circuit    Speedway Airport #4
+4715   L4RG    0 circuit    Speedway Airport #5
+4716   L4RG    0 circuit    Speedway Airport #6
+4801   L4RH    -            PT Track                               (tuning track, not a race: may not work)
