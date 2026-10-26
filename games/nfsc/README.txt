@@ -24,8 +24,11 @@ SETTINGS  (scripts\FRSFastTest.ini)
 
     [FastTest]
     Enabled=1        0 = the game starts as usual
-    Car=             car model from the CARS folder (empty = viper)
-    Track=0          track number (0 = the default, 5000)
+    Car=             your car, a folder name from CARS (empty = viper)
+    OpponentCar=     the opponents' car, as Car (empty = viper)
+    AICars=-1        number of opponents (-1 = the default, none)
+    Laps=0           laps (0 = the default, 2)
+    SkipSMS=1        no text messages (the free-roam SMS at the start)
     [Window]
     Windowed=0       1 = run in a window
     Monitor=0        0 = where the game puts it, 1 = primary, 2.. = others
