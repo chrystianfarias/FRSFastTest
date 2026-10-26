@@ -10,7 +10,7 @@ released separately.
 | Underground 2 | [`games/nfsu2`](games/nfsu2) | SPEED2.EXE v1.2 | the career's free roam from your save, or any track (SkipFE) | released |
 | Most Wanted | [`games/nfsmw`](games/nfsmw) | speed.exe v1.3 | a race with a chosen car and track (SkipFE) | beta |
 | ProStreet | [`games/nfsps`](games/nfsps) | nfs.exe v1.1 | an event with a chosen car preset (SkipFE) | beta |
-| Carbon | [`games/nfsc`](games/nfsc) | NFSC.exe v1.4 | any event with chosen cars, opponents and laps, or free roam (SkipFE) | in progress |
+| Carbon | [`games/nfsc`](games/nfsc) | NFSC.exe v1.4 | any event with chosen cars, opponents and laps, or free roam (SkipFE) | beta |
 
 Each plugin checks the code it patches and does nothing on any other
 executable. All but the Underground 2 plugin also have a
