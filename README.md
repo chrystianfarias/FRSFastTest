@@ -1,5 +1,7 @@
 # FRSFastTest
 
+![FRSFastTest](media/cover.jpg)
+
 ASI plugins for the Black Box Need for Speed games that boot the game straight
 into play: no intro movies, no "press Enter", no menus. One plugin per game,
 released separately.
