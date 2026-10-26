@@ -74,7 +74,7 @@ $license = @(
     "",
     $rule,
     "1. FRSFastTest (scripts\FRSFastTest.asi and its files)",
-    "   Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)",
+    "   FRSFastTest terms of use: free, with credit; no selling",
     $rule,
     "",
     (Get-Content (Join-Path $root "LICENSE") -Raw).TrimEnd()

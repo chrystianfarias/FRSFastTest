@@ -13,7 +13,7 @@ released separately.
 | Carbon | [`games/nfsc`](games/nfsc) | NFSC.exe v1.4 | a race with a chosen car and track (SkipFE) | in progress |
 
 Each plugin checks the code it patches and does nothing on any other
-executable. The Most Wanted, ProStreet and Carbon plugins also have a
+executable. All but the Underground 2 plugin also have a
 `[Window]` section for development: windowed mode, a fixed resolution for the
 session, the monitor to open on, and running in the background without focus.
 
@@ -25,6 +25,144 @@ session, the monitor to open on, and running in the background without focus.
 
 Each release package has the loader, the files and a README for its game.
 
+## Configuration
+
+`FRSFastTest.ini` sits beside the plugin in `scripts`. These are the defaults each package ships with.
+
+### Underground
+
+```ini
+[FastTest]
+; 0 = the game starts as usual
+Enabled = 1
+; Track: a track number (0 = the default, the first track of the list)
+Track = 0
+; Laps (0 = the default, 2)
+Laps = 0
+; Car: a car folder name, e.g. SKYLINE, CIVIC, SUPRA, RX7, 350Z, IMPREZA, LANCER, S2000 (empty = the first garage car)
+Car =
+
+[Window]
+; A window comes from NFSUnderground.WidescreenFix (WindowedMode in its ini); Monitor applies to a window only.
+; Monitor: 0 = leave the window where the game puts it, 1 = primary, 2.. = the others
+Monitor = 0
+; Width, Height: resolution for this session only (0 = the game setting)
+Width = 0
+Height = 0
+; Background: 1 = never take the focus, and keep running without it
+Background = 0
+```
+
+### Underground 2
+
+Every track, with its race type, is listed in `FRSFastTest-Tracks.txt`.
+
+```ini
+[FastTest]
+; Boot straight into free roam, no screens to click through (0 = normal start).
+Enabled=1
+; career = the career's free roam, with your save (default).
+; dev    = the developers' SkipFE: faster, straight into the city, but no save loaded.
+Mode=career
+
+; career: leave the intro movies (EA, THX, PSA, intro) out of the boot.
+SkipIntro=1
+; career: leave the 'press Enter' screen out of the boot.
+SkipSplash=1
+; career: answer the profile's 'Continue' by itself.
+AutoContinue=1
+; career: extra wait, in ms, once the career is loaded.
+DelayMs=0
+
+; dev: the track number (-1 = the race type's own; 4000, the whole city, for free roam).
+; Every track, with its race type: FRSFastTest-Tracks.txt, next to this file.
+DevTrack=-1
+; dev: the race type -- 0 free roam / circuit / speedway / SUV, 1 sprint, 2 street X, 4 drag, 5 drift.
+DevRaceType=0
+
+; Quit the game when the pause menu opens, in a session started this way (0 = off).
+QuitOnPause=0
+```
+
+### Most Wanted
+
+```ini
+[FastTest]
+; 0 = the game starts as usual
+Enabled = 1
+; Car: a car model, e.g. bmwm3gtre46, 911turbo, gti, 997s, murcielago (empty = bmwm3gtre46)
+Car =
+; Track: a track number (0 = the default, 2000)
+Track = 0
+; Laps (0 = the default, 2)
+Laps = 0
+; AICars: number of opponents (-1 = the default)
+AICars = -1
+; AIControl: 1 = the AI drives the player's car, from 1 s into the race
+AIControl = 0
+
+[Window]
+; Windowed: 1 = run in a window (the game's own windowed mode)
+Windowed = 0
+; Monitor: 0 = leave the window where the game puts it, 1 = primary, 2.. = the others
+Monitor = 0
+; Width, Height: resolution for this session only (0 = the game setting)
+Width = 0
+Height = 0
+; Background: 1 = never take the focus, and keep running without it
+Background = 0
+```
+
+### Carbon
+
+```ini
+[FastTest]
+; 0 = the game starts as usual
+Enabled = 1
+; Car: a car model from the CARS folder (empty = viper)
+Car =
+; Track: a track number (0 = the default, 5000)
+Track = 0
+
+[Window]
+; Windowed: 1 = run in a window (the game's own windowed mode)
+Windowed = 0
+; Monitor: 0 = leave the window where the game puts it, 1 = primary, 2.. = the others
+Monitor = 0
+; Width, Height: resolution for this session only (0 = the game setting)
+Width = 0
+Height = 0
+; Background: 1 = never take the focus, and keep running without it
+Background = 0
+```
+
+### ProStreet
+
+Every event id, with its track, type and layout, is listed in `FRSFastTest-Events.txt`.
+
+```ini
+[FastTest]
+; 0 = the game starts as usual
+Enabled = 1
+; Event: an event id such as 75.gr.1; all ids, with track, type and layout, are in FRSFastTest-Events.txt
+; (empty = the game's default)
+Event = 75.gr.1
+; Car: a car preset, e.g. 350z_track, bmwm3e92_track, camaro_track, rx7_track, zonda_track (empty = 350z_track)
+Car = 350z_track
+; SkipMatchup: 1 = no pre-race matchup screen
+SkipMatchup = 1
+; SkipIntroNIS: 1 = skip the race intro cut-scenes
+SkipIntroNIS = 1
+
+[Window]
+; Monitor: 0 = leave the window where the game puts it, 1 = primary, 2.. = the others
+Monitor = 0
+; Width, Height: resolution for this session only; the saved setting is kept (0 = the game setting)
+Width = 0
+Height = 0
+; Background: 1 = never take the focus, and keep running without it
+Background = 0
+```
 ## Layout
 
 ```
@@ -86,6 +224,6 @@ https://buymeacoffee.com/chrystianfarias
 
 ## License
 
-Licensed under Creative Commons Attribution-NonCommercial 4.0 International
-(CC BY-NC 4.0). You may share and adapt this work with attribution, for
-non-commercial purposes only. See [LICENSE](LICENSE) for the full text.
+Free to use, study, modify and redistribute, with credit to Chrystian Farias
+and a link back to this repository; it may not be sold, in whole or in part.
+See [LICENSE](LICENSE) for the full terms.

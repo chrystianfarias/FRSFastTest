@@ -65,7 +65,7 @@ https://buymeacoffee.com/chrystianfarias
 LICENSE
 -------
 
-FRSFastTest is licensed under Creative Commons Attribution-NonCommercial 4.0
-International (CC BY-NC 4.0). You may share and adapt this work with
-attribution, for non-commercial purposes only. Ultimate ASI Loader keeps its
-own license (MIT). See LICENSE.txt for both texts.
+FRSFastTest is free to use, share and modify, with credit to Chrystian
+Farias and a link to https://github.com/chrystianfarias/FRSFastTest. It may
+not be sold, in whole or in part. Ultimate ASI Loader keeps its own license
+(MIT). See LICENSE.txt for both texts.
