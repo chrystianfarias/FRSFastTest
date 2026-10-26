@@ -3,8 +3,17 @@
 //
 // main (0x447309) reads [0x73465C]: when set it calls 0x4B6390 instead of scheduling the front-end load (0x448B10).
 // The retail build never sets it (the only store, 0x5687F3, restores it from a replay file), but 0x4B6390 still
-// fills the race parameters (0x78A2E0..) from the SkipFE globals beside it:
-//   0x70095C  track number (-1 = the first track of the track list)
+// fills the race parameters (0x78A2E0..) from the SkipFE globals beside it. They are written from the call to
+// 0x4B6390 at 0x447315, after the boot has set its own (0x447040 sets the track from a missing Config.bin: -1):
+//   0x70095C  track number (-1 = the first track of the track list). 0x4484F0 looks it up in the track list,
+//             [0x736160] (count [0x736164], 0xFC bytes each, number at +0x6C); a number not in it crashes the load
+//             (0x449723), so the plugin checks it first. The race is always a lap race: drag and drift
+//             gameplay (a DragDriver, 0x45D660, picked by 0x425FE0) comes from the front end's race type [0x777CB8],
+//             which this path never sets up.
+//   0x6F1D4C  laps (2)
+//   0x734660  AI opponents (0)
+//   0x758C18  the player's car: bStringHash("CUSTOMIZABLE_<car>") (0x4AC460 sets the first garage car at boot).
+//             The garage, 0x758C18 + 0x2038: 0x348-byte slots whose id is at +0x344, count at 0x758C18 + 0x61D8.
 //   0x77A910  game flow state (3 = front end, 6 = racing)
 //
 // Window: the window itself comes from NFSUnderground.WidescreenFix (WindowedMode). The game's own windowed flag
@@ -17,7 +26,12 @@
 namespace {
 
 constexpr uintptr_t kSkipFE = 0x73465C;
-constexpr uintptr_t kSkipFETrack = 0x70095C;
+constexpr uintptr_t kSkipFETrack = 0x70095C, kSkipFELaps = 0x6F1D4C, kSkipFEAICars = 0x734660;
+constexpr uintptr_t kSkipFEStart = 0x4B6390, kSkipFEStartCall = 0x447315;
+constexpr uintptr_t kTrackList = 0x736160, kTrackCount = 0x736164;
+constexpr size_t kTrackSize = 0xFC, kTrackNumber = 0x6C;
+constexpr uintptr_t kPlayerCar = 0x758C18, kGarageSlots = kPlayerCar + 0x2038, kGarageCount = kPlayerCar + 0x61D8;
+constexpr size_t kGarageSlotSize = 0x348, kGarageSlotId = 0x344;
 constexpr uintptr_t kGameFlowState = 0x77A910;
 constexpr int kFlowRacing = 6;
 
@@ -31,6 +45,44 @@ constexpr uintptr_t kMainSkipFEAt = 0x447309;
 
 ft::WindowOptions g_window;
 int g_width = 0, g_height = 0;
+std::string g_car;
+int g_track = 0, g_laps = 0, g_aiCars = -1;
+
+uint32_t StringHash(const char* s) {
+    uint32_t h = 0xFFFFFFFF;
+    while (*s) h = h * 33 + (uint8_t)*s++;
+    return h;
+}
+
+// 0x4B6390 with the [FastTest] settings in place of the boot's
+void __cdecl StartSkipFE() {
+    if (g_track > 0) {
+        const uint8_t* tracks = *(const uint8_t**)kTrackList;
+        const int count = *(int*)kTrackCount;
+        bool found = false;
+        for (int i = 0; i < count && !found; i++)
+            found = *(const int16_t*)(tracks + i * kTrackSize + kTrackNumber) == g_track;
+        if (found) *(int*)kSkipFETrack = g_track;
+        else ft::Log("track %d is not in the track list (%d tracks): the default track is used", g_track, count);
+    }
+    if (g_laps > 0) *(int*)kSkipFELaps = g_laps;
+    if (g_aiCars >= 0) *(int*)kSkipFEAICars = g_aiCars;
+    if (!g_car.empty()) {
+        const uint32_t id = StringHash(("CUSTOMIZABLE_" + g_car).c_str());
+        const int count = *(int*)kGarageCount;
+        bool found = false;
+        for (int i = 0; i < count && !found; i++)
+            found = *(uint32_t*)(kGarageSlots + i * kGarageSlotSize + kGarageSlotId) == id;
+        if (found) {
+            *(uint32_t*)kPlayerCar = id;
+            ft::Log("car %s", g_car.c_str());
+        } else {
+            ft::Log("car %s is not in the garage (%d cars): the default car is used", g_car.c_str(), count);
+        }
+    }
+    ft::Log("race: track %d, laps %d, AI cars %d", *(int*)kSkipFETrack, *(int*)kSkipFELaps, *(int*)kSkipFEAICars);
+    ((void(__cdecl*)())kSkipFEStart)();
+}
 
 // 0x4086B0 with [Window] Width x Height in place of the mode's
 __declspec(naked) void SetModeHook() {
@@ -102,9 +154,15 @@ void Start() {
         return;
     }
     ft::WriteValue<int>(kSkipFE, 1);
-    const int track = ini.Int("FastTest", "Track", 0);
-    if (track > 0) ft::WriteValue<int>(kSkipFETrack, track);
-    ft::Log("SkipFE on: track %d", *(int*)kSkipFETrack);
+    g_track = ini.Int("FastTest", "Track", 0);
+    g_laps = ini.Int("FastTest", "Laps", 0);
+    g_aiCars = ini.Int("FastTest", "AICars", -1);
+    g_car = ini.String("FastTest", "Car");
+    for (char& c : g_car) c = (char)toupper((uint8_t)c);
+    if (ft::IsCallTo(kSkipFEStartCall, kSkipFEStart)) ft::WriteBranch(kSkipFEStartCall, (void*)&StartSkipFE);
+    else ft::Log("the call to 0x4B6390 was changed by another mod: the game's defaults are used");
+    ft::Log("SkipFE on: track %d, laps %d, AI cars %d, car %s", g_track, g_laps, g_aiCars,
+            g_car.empty() ? "(default)" : g_car.c_str());
 
     g_window.Read(ini);
     InstallWindow();

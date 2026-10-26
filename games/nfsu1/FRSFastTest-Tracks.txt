@@ -1,0 +1,46 @@
+FRSFastTest -- tracks for Track=
+
+Set the track's number in FRSFastTest.ini -- for a race on Stadium:
+
+    Track=1002
+
+Every race is a lap race with the default circuit gameplay: the quick start
+cannot set the race type. Drag and drift tracks load and can be driven, but
+without drag or drift gameplay (no automatic steering, the usual HUD).
+A number not in this list is ignored: the default track is used.
+
+Taken from the game's own track list (GLOBAL\GLOBALB.BUN, chunk 0x34201).
+
+Track  Region  Family    Name
+-----  ------  --------  ------------------------------
+1001   L1RA    circuit   CT1 - Market St.
+1002   L1RA    circuit   CT2 - Stadium
+1003   L1RA    circuit   DT1 - Olympic Square
+1004   L1RA    circuit   DT2 - Terminal
+1005   L1RA    circuit   DT3 - Atlantic
+1006   L1RA    circuit   DT4 - Inner City
+1007   L1RA    circuit   RS1 - Port Royal
+1008   L1RA    circuit   RS2 - National Rail
+1099   L1RX    test      Test Track
+1102   L1RA    sprint    SP2 - Liberty Gardens
+1103   L1RA    sprint    SP3 - Broadway
+1104   L1RA    sprint    SP4 - Lock Up
+1105   L1RA    sprint    SP5 - 9th & Frey
+1106   L1RA    sprint    SP6 - Bedard Bridge
+1107   L1RA    sprint    SP7 - Spillway
+1108   L1RA    sprint    SP8 - 1st Ave. Truck Stop
+1109   L1RA    sprint    SP9 - 7th & Sparling
+1201   L1RB    drag      DTDrag - 14th & Vine        (lap race only)
+1202   L1RC    drag      CTDrag - Highway 1          (lap race only)
+1206   L1RB    drag      MSNDrag - Main St.          (lap race only)
+1207   L1RE    drag      Commercial                  (lap race only)
+1210   L1RB    drag      Downtown Drag 2             (lap race only)
+1214   L1RB    drag      Mission Drag 2              (lap race only)
+1301   L1RB    drift     Drift 1                     (lap race only)
+1302   L1RB    drift     Drift 2                     (lap race only)
+1303   L1RB    drift     Drift 3                     (lap race only)
+1304   L1RB    drift     Drift 4                     (lap race only)
+1305   L1RC    drift     Drift 5                     (lap race only)
+1306   L1RC    drift     Drift 6                     (lap race only)
+1307   L1RC    drift     Drift 7                     (lap race only)
+1308   L1RC    drift     Drift 8                     (lap race only)

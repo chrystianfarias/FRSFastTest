@@ -6,7 +6,7 @@ released separately.
 
 | Game | Folder | Executable | What it boots into | Status |
 |---|---|---|---|---|
-| Underground | [`games/nfsu1`](games/nfsu1) | speed.exe v1.4 | a race on a chosen track (SkipFE) | in progress |
+| Underground | [`games/nfsu1`](games/nfsu1) | speed.exe v1.4 | a race on a chosen track (SkipFE) | beta |
 | Underground 2 | [`games/nfsu2`](games/nfsu2) | SPEED2.EXE v1.2 | the career's free roam from your save, or any track (SkipFE) | released |
 | Most Wanted | [`games/nfsmw`](games/nfsmw) | speed.exe v1.3 | a race with a chosen car and track (SkipFE) | beta |
 | ProStreet | [`games/nfsps`](games/nfsps) | nfs.exe v1.1 | an event with a chosen car preset (SkipFE) | beta |
@@ -31,12 +31,17 @@ Each release package has the loader, the files and a README for its game.
 
 ### Underground
 
+Every track, with its family, is listed in `FRSFastTest-Tracks.txt`. The race is always a lap race.
+
 ```ini
 [FastTest]
 ; 0 = the game starts as usual
 Enabled = 1
-; Track: a track number (0 = the default, the first track of the list)
+; Track: a track number (0 = the default, the first track of the list).
+; Every track: FRSFastTest-Tracks.txt, next to this file. The race is always a lap race.
 Track = 0
+; AICars: opponents (-1 = the default, none)
+AICars = -1
 ; Laps (0 = the default, 2)
 Laps = 0
 ; Car: a car folder name, e.g. SKYLINE, CIVIC, SUPRA, RX7, 350Z, IMPREZA, LANCER, S2000 (empty = the first garage car)
