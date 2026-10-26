@@ -2,8 +2,9 @@ FRSFastTest
 ===========
 
 For Need for Speed Carbon: the game boots straight into a race, through the
-developers' own quick start (SkipFE) still inside the game. No intro, no
-menus, no save loaded. Meant for modders who restart the game often.
+developers' own quick start (SkipFE) still inside the game: any event, with
+your car, opponents and laps, or free roam. No intro, no menus, no save
+loaded. Meant for modders who restart the game often.
 
 
 INSTALL
@@ -14,6 +15,7 @@ Copy everything in this folder into the game folder (the one with NFSC.exe):
     dinput8.dll                  next to NFSC.exe
     scripts\FRSFastTest.asi      into the game's "scripts" folder
     scripts\FRSFastTest.ini
+    scripts\FRSFastTest-Events.txt
 
 dinput8.dll is Ultimate ASI Loader, by ThirteenAG. If you already have an ASI
 loader in the game folder, keep yours and skip this file.
@@ -24,11 +26,12 @@ SETTINGS  (scripts\FRSFastTest.ini)
 
     [FastTest]
     Enabled=1        0 = the game starts as usual
+    Event=sf.1.1     an event id, from FRSFastTest-Events.txt (empty = free roam)
     Car=             your car, a folder name from CARS (empty = viper)
     OpponentCar=     the opponents' car, as Car (empty = viper)
     AICars=-1        number of opponents (-1 = the default, none)
-    Laps=0           laps (0 = the default, 2)
-    SkipSMS=1        no text messages (the free-roam SMS at the start)
+    Laps=0           laps of a circuit event (0 = the default, 2)
+    SkipSMS=1        no text messages (the SMS when free roam starts)
     [Window]
     Windowed=0       1 = run in a window
     Monitor=0        0 = where the game puts it, 1 = primary, 2.. = others
@@ -50,7 +53,7 @@ On any other executable FRSFastTest does nothing.
 UNINSTALL
 ---------
 
-Delete scripts\FRSFastTest.asi and its .ini. Leave dinput8.dll if other mods
+Delete scripts\FRSFastTest.asi, its .ini and FRSFastTest-Events.txt. Leave dinput8.dll if other mods
 use it.
 
 

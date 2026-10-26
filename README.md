@@ -10,7 +10,7 @@ released separately.
 | Underground 2 | [`games/nfsu2`](games/nfsu2) | SPEED2.EXE v1.2 | the career's free roam from your save, or any track (SkipFE) | released |
 | Most Wanted | [`games/nfsmw`](games/nfsmw) | speed.exe v1.3 | a race with a chosen car and track (SkipFE) | beta |
 | ProStreet | [`games/nfsps`](games/nfsps) | nfs.exe v1.1 | an event with a chosen car preset (SkipFE) | beta |
-| Carbon | [`games/nfsc`](games/nfsc) | NFSC.exe v1.4 | a race with chosen cars, opponents and laps (SkipFE) | in progress |
+| Carbon | [`games/nfsc`](games/nfsc) | NFSC.exe v1.4 | any event with chosen cars, opponents and laps, or free roam (SkipFE) | in progress |
 
 Each plugin checks the code it patches and does nothing on any other
 executable. All but the Underground 2 plugin also have a
@@ -115,19 +115,23 @@ Background = 0
 
 ### Carbon
 
+Every event id is listed in `FRSFastTest-Events.txt`.
+
 ```ini
 [FastTest]
 ; 0 = the game starts as usual
 Enabled = 1
+; Event: an event id such as sf.1.1; all ids are in FRSFastTest-Events.txt (empty = free roam)
+Event = sf.1.1
 ; Car: the player's car, a folder name from CARS, e.g. viper, bmwm3gtre46, rx7, gallardo, 997tt (empty = viper)
 Car =
 ; OpponentCar: the opponents' car, as Car (empty = viper)
 OpponentCar =
 ; AICars: number of opponents (-1 = the default, none)
 AICars = -1
-; Laps (0 = the default, 2)
+; Laps: laps of a circuit event (0 = the default, 2)
 Laps = 0
-; SkipSMS: 1 = no text messages (the free-roam SMS that holds the screen at the start)
+; SkipSMS: 1 = no text messages (the SMS that holds the screen when free roam starts)
 SkipSMS = 1
 
 [Window]
