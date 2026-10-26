@@ -1,7 +1,7 @@
-FRSFastBoot -- tracks for Mode=dev
+FRSFastTest -- tracks for Mode=dev
 ==================================
 
-Set these lines in FRSFastBoot.ini -- for a drag race on City Drag #1:
+Set these lines in FRSFastTest.ini -- for a drag race on City Drag #1:
 
     Mode=dev
     DevTrack=4201

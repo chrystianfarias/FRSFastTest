@@ -1,123 +1,28 @@
-// FRSFastBoot -- Need for Speed Underground 2 (SPEED2.EXE v1.2): boot
-// straight into free roam, with no screen to click through.
+// FRSFastTest for Need for Speed Underground 2 (SPEED2.EXE v1.2): boots straight into free roam.
 //
-// Licensed under CC BY-NC 4.0: share and adapt with attribution, for
-// non-commercial purposes only. See LICENSE.
+// Mode=career: the career's free roam from the player's save. The front end still runs (it reads the save), but
+// no screen waits for input:
+//   * Boot screens come from a table of package names (0x7F65E8..0x7F6654, two copies) walked by 0x4D9580, which
+//     skips empty names. The intro movies and UG_LS_Splash.fng ("press Enter") are pointed at the empty string
+//     0x783FE5, but only while they still hold the shipped name, so mods that already replaced them win.
+//   * The profile dialog MC_Main.fng (opened from MC_Background with flags 0x121) waits on the memory-card boot
+//     object [0x836498]: byte +4 is set while waiting, +0x60 is the choice. Choice 1 is "Continue".
+//     [0x836538] holds the pad mask of the button press; the career derives the player's pad from it (0x50D2A0),
+//     and with no press the world load indexes the pad table with -1 (0x579434). Mask 1 (pad 0) is written too.
+//   * Career > Resume is 0x495A30. Its crib and career-intro branches push front-end screens that crash from the
+//     main menu (0x5377C1), so only its last branch is run (0x495A93..0x495ADC): port, start spot, career flags,
+//     then 0x5404A0, which fills TheRaceParameters for track 4000, race type 0, and starts the load.
+//   * Game flow [0x8654A4]: 3 = front end, 6 = gameplay. "Career loaded" is byte [0x83A9E0 + 0x20].
 //
-// Two ways in, chosen in the ini:
+// Mode=dev: the developers' SkipFE flag [0x864FAC]. The boot (0x57DCB0) then skips the front end and calls
+// 0x53FEB0, which fills TheRaceParameters from the globals beside it: track [0x7FAA18] (-1 = race type default,
+// 4000 for type 0), race type [0x7FAA28], drag and drift markers [0x864FC0] / [0x864FC4]. Retail clears the flag
+// at 0x58176B (mov [0x864FAC], ebx); that store is NOPed.
 //
-//   Mode=career  (the default) the career's free roam, from the player's own
-//                save: the front end still runs, since that is where the save
-//                is read, but every screen that waits for the player is
-//                answered or left out.
-//   Mode=dev     the developers' own switch, SkipFE: the front end never runs
-//                and the game loads the whole city at once -- faster, but with
-//                no save loaded (no money, a default car, no shops).
-//
-// ---- Mode=career
-//
-// What Career > Resume runs was read out of the executable:
-//
-//   0x495A30  cdecl(port)  the resume handler. Sets career mode
-//             ([0x850078] = 1). A save whose crib is open (0x500B80 on the
-//             career table 0x85AD40 with 0xDD60E403) gets the crib screen
-//             first, and a career not started ([0x86347C] == 0) its intro;
-//             both are front-end screens pushed over the career menu, and
-//             from the main menu they crash (0x5377C1). Otherwise it picks the
-//             start spot and jumps to 0x5404A0, which fills TheRaceParameters
-//             for track 4000 (the whole city), race type 0 (free roam), and
-//             starts the load from the front end (0x578320).
-//   0x4AF325  the menu's own call: `push [0x836538]; call 0x495A30`, after
-//             checking byte [0x83A9E0 + 0x20] (0x502FE0): "a career is loaded".
-//   0x8654A4  game flow: 3 is the front end, 6 gameplay.
-//
-// The plugin runs that handler's last branch only (0x495A93..0x495ADC): the
-// port, the start spot, the career flags, and 0x5404A0 -- no screen at all.
-//
-// Before that, the "press Enter" screen never shows. The front end's boot
-// screens come from a static table of package names (0x7F65E8..0x7F6620, and
-// a second copy at 0x7F6620..0x7F6654 for the other configuration), walked by
-// 0x4D9580, which skips any entry whose name is empty:
-//
-//   DiscErrorPC, MC_Bootup, LS_BlankMovie, LS_EAlogo, LS_THXMovie,
-//   LS_PSAMovie, UG_LS_IntroFMV, UG_LS_Splash, MC_Background, UI_Main
-//
-// UG_LS_Splash.fng is the "press Enter" screen, and the four movies and the
-// blank one before it are the intro. Their entries are pointed at the empty
-// string the table already uses (0x783FE5) before the front end starts, and
-// the boot goes on without them. An entry is only changed while it still
-// names the shipped screen: another mod that has taken it (NFSU2ExtraOptions
-// skips the movies its own way) keeps it, and the two never fight.
-//
-// And the profile's "Continue" is answered without the screen. The front end
-// opens the memory-card dialog MC_Main.fng from MC_Background (0x4C5235,
-// 0x4A3100 with flags 0x121); it reads the profile, then waits for a choice:
-//
-//   [0x836498]       the memory-card boot object; byte +4 is set while it
-//                    waits for the player's choice, and +0x60 is the choice.
-//   0x4A3AE0         what MC_Main's buttons do (from 0x4F3780): "Continue"
-//                    (button hash 0xB8A7C6CE, as its neighbours CD and CF)
-//                    writes choice 1 when +4 is set; the rest only hides the
-//                    buttons. The boot object's own state machine then commits
-//                    the profile and closes the dialog.
-//
-// So the plugin writes choice 1 the moment the boot dialog (flags 0x121) waits
-// for it, before any career is loaded -- never for any other memory-card
-// question.
-//
-// A button press also names the controller: MC_Main's handler stores the
-// pressing pad's mask in [0x836538] (1 = pad 0, 2 = pad 1, ...; 0x4FB9AC),
-// and the career takes the player's pad from it (0x50D2A0: mask -> index,
-// -1 for none). With no press it stays 0, the player gets pad -1, and the
-// world load reads past the pad table (0x579434, 0x8655A0 + pad * 0x1C8). So
-// the answer also writes mask 1, pad 0 -- what the keyboard gave every time.
-//
-// ---- Mode=dev
-//
-// [0x864FAC] is the SkipFE flag: with it set, the boot never opens the menus
-// (0x57DCB0 calls the front end 0x4C57C0 only when it is zero) and goes to
-// 0x53FEB0 instead (0x580E3C), which fills TheRaceParameters from the SkipFE
-// globals beside it. The race type [0x7FAA28] picks the track when none is
-// named ([0x7FAA18] = -1): type 0 is track 4000, "L4RA (40XX-41XX)", free
-// roam. The release build switches the flag off at 0x58176B
-// (`mov [0x864FAC], ebx`, ebx zero); that one store is removed and the flag
-// set before the game starts.
-//
-// Any other track can be named instead (DevTrack): 0x53FEB0 takes [0x7FAA18]
-// as it is when it is not -1. The race type then has to be the track's: the
-// career's race records (GLOBALB 0x34A11, byte +0xF) give 0 circuit / URL /
-// SUV, 1 sprint, 2 street X, 4 drag, 5 drift. Drag and drift also have a flag
-// each ([0x864FC0], [0x864FC4]; 0x53FFD3..0x540018 copy them into the race as
-// its drag and drift markers), set here from the race type.
-//
-// ---- Both
-//
-// The plugin runs on the game's thread, from the first of the two calls the
-// main loop makes to an empty stub (0x581470; SpeedLoader takes the second).
-// The call is re-pointed at the plugin, which calls whatever was there first.
-// NFSU2ExtraOptions re-points the same call, and it loads after this plugin,
-// so a watcher thread puts the plugin back on top -- still calling the one it
-// replaces -- whenever it stops being called during the boot.
-//
-// Optionally, a session that came in this way ends at the pause menu: the
-// game quits the moment UI_Pause.fng is up. The menu itself is what is looked
-// for -- 0x52CF60 cdecl(name), the game's own "is this package up" -- not a
-// key, since mods use Esc, and the pause menu has more than one way in (the
-// joystick-event handler at 0x606730 opens it on several paths).
-//
-// FRSFastBoot.ini beside the plugin:
-//   [FastBoot]
-//   Enabled=1        0 leaves the game alone
-//   Mode=career      career: the career's free roam; dev: SkipFE, no save
-//   SkipIntro=1      career: leave the intro movies out of the boot
-//   SkipSplash=1     career: leave the "press Enter" screen out of the boot
-//   AutoContinue=1   career: answer the profile's "Continue" by itself
-//   DelayMs=0        career: extra wait once the career is loaded
-//   DevTrack=-1      dev: the track number (-1: the race type's own, 4000 for 0)
-//   DevRaceType=0    dev: 0 free roam / circuit, 1 sprint, 2 street X, 4 drag, 5 drift
-//   QuitOnPause=0    1 quits the game when the pause menu opens, in a session
-//                    this plugin started
-// In career mode, holding Shift when the career loads stays in the menus.
+// Both modes run on the game thread from the first of the main loop's two calls to an empty stub (0x581470).
+// NFSU2ExtraOptions loads later and redirects the same call; during boot a watcher re-chains this plugin on top
+// when it stops being called. QuitOnPause exits once UI_Pause.fng is active (0x52CF60, cdecl(name) -> bool),
+// which catches every way into the pause menu.
 
 #include <windows.h>
 
@@ -236,8 +141,7 @@ bool EnableSkipFrontEnd() {
 
 // ------------------------------------------------------------- career
 
-// Takes a screen out of the boot, in both copies of the table: every entry
-// that still names it (by the shipped string's address) is emptied.
+// Empties every boot-table entry (both copies) that still points at the shipped name.
 void DropBootScreen(uintptr_t name) {
     for (uintptr_t entry = kBootTableStart; entry < kBootTableEnd; entry += 4) {
         if (*(uintptr_t*)entry != name) continue;
@@ -248,13 +152,13 @@ void DropBootScreen(uintptr_t name) {
     }
 }
 
-// Choice 1 -- "Continue" -- for the boot's profile dialog, once it waits.
+// Answers "Continue" (choice 1) in the boot profile dialog once it waits for input.
 void AnswerProfileDialog() {
     if (!g_autoContinue || g_answered || Read<unsigned char>(kCareerLoaded)) return;
     const uintptr_t boot = Read<uintptr_t>(kMemCardBoot);
     if (!boot || !Read<unsigned char>(boot + kWaitingForChoice)) return;
     const unsigned flags = Read<unsigned>(kDialogFlags);
-    if (flags != kBootDialogFlags) {   // some other memory-card question: the player's
+    if (flags != kBootDialogFlags) {   // a different memory-card prompt: left to the player
         g_answered = true;
         return;
     }
@@ -263,14 +167,14 @@ void AnswerProfileDialog() {
     g_answered = true;
 }
 
-// Once the career is loaded in the front end: straight to its free roam.
+// Starts free roam once the career is loaded in the front end.
 void CareerTick(int flow) {
     if (flow == kFlowFrontEnd) AnswerProfileDialog();
     if (g_done) return;
 
     const int career = Read<unsigned char>(kCareerLoaded);
 
-    // Past the menus already (a race, free roam): nothing left to do.
+    // already past the front end
     if (flow > kFlowFrontEnd) {
         g_done = true;
         return;
@@ -287,11 +191,11 @@ void CareerTick(int flow) {
     if (now - g_readySince < g_delayMs) return;
 
     g_done = true;
-    if (::GetAsyncKeyState(VK_SHIFT) & 0x8000) return;   // the player stays in the menus
-    // A career not started yet has an intro, and that is a front-end screen.
+    if (::GetAsyncKeyState(VK_SHIFT) & 0x8000) return;   // Shift held: stay in the menus
+    // a career not yet started has an intro, which is a front-end screen
     if (!Read<unsigned char>(kCareerStarted)) return;
-    // 0x495A93..0x495ADC, as the game runs it.
-    if (!Read<int>(kMenuPort)) *(volatile int*)kMenuPort = kKeyboardPadMask;   // no pad chose: pad 0
+    // 0x495A93..0x495ADC
+    if (!Read<int>(kMenuPort)) *(volatile int*)kMenuPort = kKeyboardPadMask;   // no press recorded: pad 0
     const int port = Read<int>(kMenuPort);
     *(volatile int*)kCareerMode = 1;
     *(volatile int*)kResumePort = reinterpret_cast<int(__cdecl*)(int)>(kPortFor)(port);
@@ -307,7 +211,7 @@ void CareerTick(int flow) {
 
 // --------------------------------------------------------------- both
 
-// The pause menu of a session this plugin started: the game ends there.
+// Exits at the pause menu in a session this plugin started.
 void QuitAtPauseMenu(int flow) {
     if (!g_quitOnPause || !g_jumped || flow != kFlowGameplay) return;
     if (!reinterpret_cast<bool(__cdecl*)(const char*)>(kPackageActive)(kPauseMenu)) return;
@@ -343,11 +247,9 @@ bool HookMainLoop() {
     return true;
 }
 
-// Keeps the plugin on the call through the boot. A hook installed over this
-// one that still calls it keeps g_lastCall fresh and is left alone; one that
-// dropped it is chained under the plugin. Only during the boot: later, a long
-// loading screen could make a hook that does call this one look like it
-// dropped it, and re-chaining it would make the two call each other.
+// Keeps the plugin on the stub call during boot. A later hook that still chains to us keeps g_lastCall fresh and is
+// left alone; one that dropped us is chained underneath. Limited to the boot: a long loading screen would make a
+// chaining hook look stale, and re-chaining it would create a call cycle.
 DWORD WINAPI Watch(LPVOID) {
     for (int i = 0; i < 600; ++i) {
         ::Sleep(100);
@@ -359,7 +261,7 @@ DWORD WINAPI Watch(LPVOID) {
     return 0;
 }
 
-// The resume handler must be the one this was written against.
+// Identifies SPEED2.EXE v1.2 by the start of the resume handler.
 bool RightExecutable() {
     static const unsigned char kResumeStart[] = { 0x55, 0x8B, 0xEC, 0x68, 0x03, 0xE4, 0x60, 0xDD };
     return std::memcmp((const void*)kResumeCareer, kResumeStart, sizeof(kResumeStart)) == 0;
@@ -373,7 +275,7 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
     ::DisableThreadLibraryCalls(module);
 
     const std::wstring ini = BesidePlugin(L".ini");
-    const wchar_t* section = L"FastBoot";
+    const wchar_t* section = L"FastTest";
     wchar_t mode[16] = {};
     ::GetPrivateProfileStringW(section, L"Mode", L"career", mode, 16, ini.c_str());
     g_mode = ::_wcsicmp(mode, L"dev") == 0 ? Mode::Dev : Mode::Career;
@@ -383,13 +285,12 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
     g_skipIntro = ::GetPrivateProfileIntW(section, L"SkipIntro", 1, ini.c_str()) != 0;
     g_autoContinue = ::GetPrivateProfileIntW(section, L"AutoContinue", 1, ini.c_str()) != 0;
     g_devRaceType = (int)::GetPrivateProfileIntW(section, L"DevRaceType", 0, ini.c_str());
-    // As text: GetPrivateProfileInt turns a negative value into 0.
+    // read as text: GetPrivateProfileInt does not take negative values
     wchar_t track[16] = {};
     ::GetPrivateProfileStringW(section, L"DevTrack", L"-1", track, 16, ini.c_str());
     g_devTrack = (int)std::wcstol(track, nullptr, 10);
     if (g_devTrack <= 0) g_devTrack = -1;
     g_quitOnPause = ::GetPrivateProfileIntW(section, L"QuitOnPause", 0, ini.c_str()) != 0;
-    // Only the executable this was written against.
     if (!g_enabled || !RightExecutable()) return TRUE;
 
     if (g_mode == Mode::Dev) {

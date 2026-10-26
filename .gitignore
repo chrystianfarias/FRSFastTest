@@ -2,3 +2,6 @@ build/
 out/
 .vs/
 *.user
+third_party/
+dist/
+tools/dev/games.local.psd1
