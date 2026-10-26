@@ -7,7 +7,7 @@ released separately.
 | Game | Folder | Executable | What it boots into | Status |
 |---|---|---|---|---|
 | Underground | [`games/nfsu1`](games/nfsu1) | speed.exe v1.4 | a race on a chosen track (SkipFE) | beta |
-| Underground 2 | [`games/nfsu2`](games/nfsu2) | SPEED2.EXE v1.2 | the career's free roam from your save, or any track (SkipFE) | released |
+| Underground 2 | [`games/nfsu2`](games/nfsu2) | SPEED2.EXE v1.2 | the career's free roam from your save, or any track (SkipFE) | beta |
 | Most Wanted | [`games/nfsmw`](games/nfsmw) | speed.exe v1.3 | a race with a chosen car and track (SkipFE) | beta |
 | ProStreet | [`games/nfsps`](games/nfsps) | nfs.exe v1.1 | an event with a chosen car preset (SkipFE) | beta |
 | Carbon | [`games/nfsc`](games/nfsc) | NFSC.exe v1.4 | any event with chosen cars, opponents and laps, or free roam (SkipFE) | beta |

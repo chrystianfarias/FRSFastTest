@@ -7,7 +7,7 @@
 #   .\tools\package.ps1 -Game nfsps -Version 0.2.0
 #   .\tools\package.ps1 -Game nfsmw -NoAsiLoader     # for players who already have one
 #
-# Releases are tagged per game: <game>-v<version> (nfsu2-v1.0.0).
+# Releases are tagged per game: <game>-v<version> (nfsu2-v0.1.0).
 # Ultimate ASI Loader (ThirteenAG, MIT) is downloaded once, at the pinned version, into third_party\asi-loader;
 # its license is included in the package.
 
