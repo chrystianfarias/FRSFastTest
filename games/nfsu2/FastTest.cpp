@@ -17,7 +17,11 @@
 // Mode=dev: the developers' SkipFE flag [0x864FAC]. The boot (0x57DCB0) then skips the front end and calls
 // 0x53FEB0, which fills TheRaceParameters from the globals beside it: track [0x7FAA18] (-1 = race type default,
 // 4000 for type 0), race type [0x7FAA28], drag and drift markers [0x864FC0] / [0x864FC4]. Retail clears the flag
-// at 0x58176B (mov [0x864FAC], ebx); that store is NOPed.
+// at 0x58176B (mov [0x864FAC], ebx); that store is NOPed. The race type goes to TheRaceParameters +0x10
+// [0x89E7B0] as is: 0 is free roam (no race path, no race HUD, AddRandomEncounterCars), 1 a race (what every career
+// event sets, 0x532332; AddAIOpponentCars(OpponentCount)). Beside it: AI opponents [0x864FB0] -> OpponentCount
+// [0x89E7C4], laps [0x7FAA20] -> [0x89E7BC], point to point [0x864FD4] -> [0x89E7B4] (a sprint), direction
+// [0x864FB4] -> [0x89E7A4] (0 forward, 1 backward). The game only overwrites them while replaying a joylog.
 //
 // Both modes run on the game thread from the first of the main loop's two calls to an empty stub (0x581470).
 // NFSU2ExtraOptions loads later and redirects the same call; during boot a watcher re-chains this plugin on top
@@ -78,6 +82,10 @@ constexpr uintptr_t kSkipFeRaceType   = 0x7FAA28;
 constexpr uintptr_t kSkipFeTrack      = 0x7FAA18;   // -1: the race type's default
 constexpr uintptr_t kSkipFeDrag       = 0x864FC0;
 constexpr uintptr_t kSkipFeDrift      = 0x864FC4;
+constexpr uintptr_t kSkipFeAICars     = 0x864FB0;
+constexpr uintptr_t kSkipFeLaps       = 0x7FAA20;
+constexpr uintptr_t kSkipFePointToPoint = 0x864FD4;
+constexpr uintptr_t kSkipFeDirection  = 0x864FB4;
 constexpr int       kRaceTypeDrag     = 4;
 constexpr int       kRaceTypeDrift    = 5;
 
@@ -99,6 +107,10 @@ bool  g_skipIntro = true;
 bool  g_autoContinue = true;
 int   g_devRaceType = 0;
 int   g_devTrack = -1;
+int   g_devOpponents = -1;     // -1: the game's own (0)
+int   g_devLaps = 0;           // 0: the game's own (2)
+int   g_devPointToPoint = -1;  // -1: the game's own (0)
+int   g_devDirection = -1;     // -1: the game's own (forward)
 bool  g_quitOnPause = false;
 
 volatile bool g_done = false;      // the career boot has nothing left to do
@@ -135,6 +147,10 @@ bool EnableSkipFrontEnd() {
     *(int*)kSkipFeRaceType = g_devRaceType;
     *(int*)kSkipFeDrag = g_devRaceType == kRaceTypeDrag;
     *(int*)kSkipFeDrift = g_devRaceType == kRaceTypeDrift;
+    if (g_devOpponents >= 0) *(int*)kSkipFeAICars = g_devOpponents;
+    if (g_devLaps > 0) *(int*)kSkipFeLaps = g_devLaps;
+    if (g_devPointToPoint >= 0) *(int*)kSkipFePointToPoint = g_devPointToPoint;
+    if (g_devDirection >= 0) *(int*)kSkipFeDirection = g_devDirection;
     *(int*)kSkipFeFlag = 1;
     return true;
 }
@@ -290,6 +306,15 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
     ::GetPrivateProfileStringW(section, L"DevTrack", L"-1", track, 16, ini.c_str());
     g_devTrack = (int)std::wcstol(track, nullptr, 10);
     if (g_devTrack <= 0) g_devTrack = -1;
+    const auto signedValue = [&](const wchar_t* key, int fallback) {
+        wchar_t text[16] = {};
+        ::GetPrivateProfileStringW(section, key, std::to_wstring(fallback).c_str(), text, 16, ini.c_str());
+        return (int)std::wcstol(text, nullptr, 10);
+    };
+    g_devOpponents = signedValue(L"DevOpponents", -1);
+    g_devLaps = signedValue(L"DevLaps", 0);
+    g_devPointToPoint = signedValue(L"DevPointToPoint", -1);
+    g_devDirection = signedValue(L"DevDirection", -1);
     g_quitOnPause = ::GetPrivateProfileIntW(section, L"QuitOnPause", 0, ini.c_str()) != 0;
     if (!g_enabled || !RightExecutable()) return TRUE;
 
