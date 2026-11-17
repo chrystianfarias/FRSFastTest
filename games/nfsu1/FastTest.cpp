@@ -22,6 +22,8 @@
 //   freeroam                  (optional: a drive, not a race -- see "Free roam" below)
 //   embedded                  (optional: the editor shows the game in its view, so the window's place and size are
 //                              left to it -- no centring on a monitor, no resizing, no keeping the focus away)
+//   graphics <0..3>           (optional: a graphics preset -- see "Graphics" below)
+//   graphics <NAME> <value>   (optional, any number: one graphics option, e.g. "graphics WorldLOD 3")
 // read and deleted at start, so it only applies to the launch that wrote it. A second after the player's car is
 // first there in gameplay, it is put at the pose the way the game puts it on the finish line at the end of a race
 // (0x422F34): 0x427E60 (ecx = car, edx = position, eax = heading as a bAngle, stack: speed, ghost; ret 8), then
@@ -42,8 +44,10 @@
 //     (0x423268 + 2 * 4) is pointed at the skip.
 //   - the pre-race animation (RCSTATE_PRERACE, 0x423280): it plays GLOBAL\PRERACEANIM.LZC when 0x448440 says that
 //     is loaded (the call at 0x42333C); told it is not, the pre-race starts the countdown and the race at once.
+//   - the start cut-scene (the NIS the pre-race plays): its tick (message 3, through 0x423500) goes to its
+//     skip (message 4, 0x4234B1), which starts the countdown and the race.
 //   - the countdown (0x434D10, 3-2-1 of 0x6B79E0 / 0x6B79E4 seconds each): 0.01 s, written every frame of the
-//     load (BayviewU1 puts its own value back as each track loads).
+//     session (BayviewU1 puts its own value back as each track loads).
 //   - the track map: 0x58E810 (stdcall 1, ret 4, not FEng) is called from 0x409EF0 for each player; that call goes
 //     through a stub that returns at once. The call is chained, not replaced: BayviewU1 jumps from the function's
 //     first bytes and CockpitU1 may have redirected the call already.
@@ -53,6 +57,29 @@
 //     the sections load (slot 12, 0x4457C0: their SceneryInfos name no model).
 //   - Esc, with the game's window in front, closes the game (ExitProcess, as Underground 2's QuitOnPause). Not the
 //     pause itself: the game pauses on its own when it loses the focus, which is every click in the editor.
+//   - no music: the profile's music volume, float [0x7588F4] (third of the six volumes from 0x7588EC, the master
+//     first; the options screens' sliders), is held at 0, as the player's own slider at its lowest. The music voice (0x53C020, vtable
+//     0x6BE0AC) starts a song only when music x master > 0, and 0x51CC10 (stdcall, the audio world [0x7356A0], whose
+//     +8 the callers point at 0x7588EC) hands the volumes to every voice, once in gameplay. Sound effects, engine and
+//     speech keep theirs.
+//
+// Graphics: the video options are ints in .data, named by the table 0x700EC0 ({name, int*, type 0}, BPP RES
+// PERFORMANCE ENVMAP WORLDENVMAP SHADOW HEADLIGHTS CARLIGHTING DAMAGE CROWD ROADREFLECTION FOG MOTIONBLUR LIGHTSTREAKS
+// LIGHTGLOW ANIMATEDTEXTURE PARTICLESYSTEMS DEPTHOFFIELD WorldLOD CarLOD SOUNDPERF SOUNDENABLE). At boot the device
+// set-up (0x408830 -> 0x410E50) rates the hardware (0x410A00, from its CPU and card tables) and sets options from
+// it: below 0.3, preset 0 (0x410ED0), everything at its lowest -- what SkipFE showed on today's PCs. The player's choices are only read when the front
+// end loads a profile (0x41D030): <CSIDL_COMMON_APPDATA>\NFS Underground\<profile>.cfg, "NAME: value" lines, read by
+// 0x41C680 through the table, then 0x410CE0 lowers each option to the hardware's cap (0x701040..) and checks RES
+// against the display modes. SkipFE never loads a profile, so the boot's preset stayed. Now, ahead of 0x4B6390 (the
+// device and its preset are set up by then, 0x447262 -> 0x53E020 -> 0x408830), the plugin reads the newest .cfg
+// there (or [Graphics] Profile) the same way, then the overrides, then calls 0x410CE0:
+//   FRSFastTest.ini [Graphics]   Profile = <name> (empty: the profile saved last; "-": none, the boot's preset)
+//                                Preset = 0..3 (the game's PERFORMANCE presets, 0x410ED0 with edx = level, which
+//                                         would also set RES: BPP and RES are kept; -1: none)
+//                                <NAME> = <value>, any option of the table, e.g. WorldLOD = 3
+//   launch-pose.txt              graphics <0..3>          a preset (after the ini)
+//                                graphics <NAME> <value>  one option (after the preset), names as in the .cfg,
+//                                                          any case
 //
 // Window: the window itself comes from NFSUnderground.WidescreenFix (WindowedMode). The game's own windowed flag
 // [0x736374] (copied into D3DPRESENT_PARAMETERS.Windowed at 0x4086F0) is not used: with it CreateDevice fails and
@@ -61,9 +88,14 @@
 // substitutes [Window] Width x Height. A window is resized to that size and moved to [Window] Monitor.
 #include "fasttest.h"
 
+#include <shlobj.h>
+
 #include <algorithm>
 #include <cmath>
+#include <utility>
 #include <vector>
+
+#pragma comment(lib, "shell32.lib")   // SHGetFolderPathA, as the game finds its profiles
 
 namespace {
 
@@ -84,12 +116,34 @@ constexpr uintptr_t kFrameCall = 0x447A10;
 constexpr uintptr_t kLoaderTable = 0x7007E0, kMarkersSlot = 2;
 constexpr uint32_t kChunkMarkers = 0x34146, kForwardStartingPosition = 0x8E55C895;   // bStringHash
 constexpr uintptr_t kFlybyJumpTable = 0x423268, kFlybyTick = 0x4230FA, kFlybySkip = 0x423103;
+// RCSTATE_PRERACE (0x423280): messages 1..10 through 0x423500; 3 the tick, 4 the skip
+constexpr uintptr_t kPreRaceJumpTable = 0x423500, kPreRaceTick = 0x423448, kPreRaceSkip = 0x4234B1;
 constexpr uintptr_t kPreRaceAnimCall = 0x42333C, kIsLoaded = 0x448440;
 constexpr uintptr_t kCountdown = 0x6B79E0;
+constexpr uintptr_t kRaceStart = 0x736194;   // the race's start object: +0xC the length of each count
 constexpr uintptr_t kTrackMapCall = 0x409EF0;
 constexpr uintptr_t kSceneryLoaderSlot = 12;   // 0x4457C0, chunk 0x80034100
+constexpr uintptr_t kFileSystemCreateW = 0x5C7FDC, kFileSystemCreateA = 0x5C7FF7;   // the game file system's calls
+constexpr uintptr_t kImportCreateFileW = 0x6971C4, kImportCreateFileA = 0x6971C0;   // speed.exe's import table
 constexpr uintptr_t kSetMode = 0x4086B0, kSetModeResume = 0x4086B5;
 constexpr uint8_t kSetModeStart[] = {0x53, 0x8B, 0x5C, 0x24, 0x08};   // push ebx; mov ebx, [esp+8]
+
+// audio: the profile's six volumes (master first, music third) and their hand-out to the voices
+constexpr uintptr_t kAudioWorld = 0x7356A0, kVolumes = 0x7588EC, kMusicVolume = 0x7588F4;
+constexpr uintptr_t kApplyVolumes = 0x51CC10;
+constexpr uint8_t kApplyVolumesStart[] = {0xA1, 0xD8, 0x1D, 0x6F, 0x00};   // mov eax, [0x6F1DD8] (audio on)
+
+// graphics: the option table, the PERFORMANCE presets and the hardware caps
+constexpr uintptr_t kVideoOptions = 0x700EC0;   // {name, int* value, type}, 12 bytes each
+// The table ends with an entry whose name is an empty string (0x6B9172) and whose value is null -- not with a null
+// name: past it lie other data. An entry is an option while its name is a non-empty string and its value is set.
+inline bool IsVideoOption(const uint8_t* e) {
+    const char* name = *(const char* const*)e;
+    return name && *name && *(int* const*)(e + 4);
+}
+constexpr uintptr_t kVideoPreset = 0x410ED0, kVideoClamp = 0x410CE0;
+constexpr uint8_t kVideoPresetStart[] = {0x33, 0xC9, 0x3B, 0xD1};               // xor ecx, ecx; cmp edx, ecx
+constexpr uint8_t kVideoClampStart[] = {0xA1, 0x40, 0x10, 0x70, 0x00};          // mov eax, [0x701040]
 
 // main: mov eax, [0x73465C]; add esp, 8; test eax, eax
 constexpr uint8_t kMainSkipFE[] = {0xA1, 0x5C, 0x46, 0x73, 0x00, 0x83, 0xC4, 0x08, 0x85, 0xC0};
@@ -123,6 +177,15 @@ std::vector<uint32_t> g_hide;     // solids whose scenery is left out of a free 
 Loader g_sceneryLoader = nullptr;
 using CreateFileAFn = HANDLE(WINAPI*)(LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
 CreateFileAFn g_createFileA = nullptr;
+bool g_musicMuted = false;        // the music volume was handed to the voices at 0
+
+// graphics: one source's settings, applied in order (profile, ini, launch-pose.txt)
+struct GraphicsSettings {
+    int preset = -1;                                  // 0..3, -1 = none
+    std::vector<std::pair<std::string, int>> options;   // option name, value
+};
+GraphicsSettings g_graphicsIni, g_graphicsPose;
+std::string g_graphicsProfile;    // [Graphics] Profile
 
 std::string GameFolder() {
     char path[MAX_PATH] = {};
@@ -147,7 +210,14 @@ void ReadLaunchPose() {
             g_embedded = true;
         else if (strncmp(line, "freeroam", 8) == 0)
             g_freeRoam = true;
-        else {
+        else if (strncmp(line, "graphics ", 9) == 0) {
+            char name[64] = {}, value[32] = {};
+            const int n = sscanf(line + 9, "%63s %31s", name, value);
+            if (n == 2)
+                g_graphicsPose.options.emplace_back(name, (int)strtol(value, nullptr, 0));
+            else if (n == 1)
+                g_graphicsPose.preset = (int)strtol(name, nullptr, 10);
+        } else {
             unsigned hash = 0;
             if (sscanf(line, "hide %x", &hash) == 1) g_hide.push_back(hash);
         }
@@ -158,6 +228,140 @@ void ReadLaunchPose() {
     if (g_pose.pending)
         ft::Log("launch pose: the car goes to (%.1f, %.1f, %.1f) heading %.1f once in gameplay", g_pose.x, g_pose.y,
                 g_pose.z, g_pose.heading);
+}
+
+// ---- graphics (see the top of the file)
+
+int* VideoOption(const char* name) {
+    for (const uint8_t* e = (const uint8_t*)kVideoOptions; IsVideoOption(e); e += 12)
+        if (*(const int*)(e + 8) == 0 && _stricmp(*(const char* const*)e, name) == 0) return *(int* const*)(e + 4);
+    return nullptr;
+}
+
+void SetVideoOptions(const GraphicsSettings& settings, const char* from) {
+    for (const auto& option : settings.options) {
+        if (int* value = VideoOption(option.first.c_str())) *value = option.second;
+        else ft::Log("graphics: %s: no option \"%s\"", from, option.first.c_str());
+    }
+}
+
+// 0x410ED0 (edx = level): the options screen's PERFORMANCE presets, then the hardware caps. A preset also sets
+// the display mode (RES 0 at level 0, 1 above), which stays the player's here.
+void VideoPreset(int level, const char* from) {
+    if (level < 0) return;
+    level = std::min(level, 3);
+    int* bpp = VideoOption("BPP");
+    int* res = VideoOption("RES");
+    const int keepBpp = bpp ? *bpp : 0, keepRes = res ? *res : 0;
+    __asm {
+        mov edx, level
+        mov eax, kVideoPreset
+        call eax
+    }
+    if (bpp) *bpp = keepBpp;
+    if (res) *res = keepRes;
+    ft::Log("graphics: %s: preset %d", from, level);
+}
+
+std::string ProfileFolder() {
+    char path[MAX_PATH] = {};
+    if (FAILED(SHGetFolderPathA(nullptr, CSIDL_COMMON_APPDATA, nullptr, 0, path))) return {};
+    return std::string(path) + "\\NFS Underground\\";
+}
+
+// <profile>.cfg ("NAME: value" lines, as 0x41C7A0 writes them): [Graphics] Profile, or the one saved last
+bool ReadProfileGraphics(GraphicsSettings& out, std::string& file) {
+    const std::string folder = ProfileFolder();
+    if (folder.empty()) return false;
+    if (!g_graphicsProfile.empty()) {
+        file = g_graphicsProfile + ".cfg";
+    } else {
+        WIN32_FIND_DATAA found;
+        const HANDLE find = FindFirstFileA((folder + "*.cfg").c_str(), &found);
+        if (find == INVALID_HANDLE_VALUE) return false;
+        FILETIME newest{};
+        do {
+            if (CompareFileTime(&found.ftLastWriteTime, &newest) > 0) {
+                newest = found.ftLastWriteTime;
+                file = found.cFileName;
+            }
+        } while (FindNextFileA(find, &found));
+        FindClose(find);
+    }
+    FILE* f = fopen((folder + file).c_str(), "rt");
+    if (!f) return false;
+    char line[128];
+    while (fgets(line, sizeof(line), f)) {
+        char name[64] = {}, value[32] = {};
+        if (sscanf(line, " %63[^: ] : %31s", name, value) == 2)
+            out.options.emplace_back(name, (int)strtol(value, nullptr, 0));
+    }
+    fclose(f);
+    file = folder + file;
+    return true;
+}
+
+// Ahead of 0x4B6390: the player's profile, then the ini, then launch-pose.txt, then the hardware caps (0x410CE0)
+void ApplyGraphics() {
+    if (!ft::Matches(kVideoPreset, kVideoPresetStart, sizeof(kVideoPresetStart)) ||
+        !ft::Matches(kVideoClamp, kVideoClampStart, sizeof(kVideoClampStart)) || !VideoOption("WorldLOD")) {
+        ft::Log("graphics: the option code differs from v1.4 (another mod?): the boot's settings stay");
+        return;
+    }
+    if (g_graphicsProfile != "-") {
+        GraphicsSettings profile;
+        std::string file;
+        if (ReadProfileGraphics(profile, file)) {
+            SetVideoOptions(profile, file.c_str());
+            ft::Log("graphics: the player's settings from %s", file.c_str());
+        } else {
+            ft::Log("graphics: no profile .cfg in %s: the boot's preset stays", ProfileFolder().c_str());
+        }
+    }
+    VideoPreset(g_graphicsIni.preset, "FRSFastTest.ini");
+    SetVideoOptions(g_graphicsIni, "FRSFastTest.ini");
+    VideoPreset(g_graphicsPose.preset, "launch-pose.txt");
+    SetVideoOptions(g_graphicsPose, "launch-pose.txt");
+    ((void(__cdecl*)())kVideoClamp)();
+    std::string all;
+    for (const uint8_t* e = (const uint8_t*)kVideoOptions; IsVideoOption(e); e += 12) {
+        if (*(const int*)(e + 8) != 0) continue;
+        char item[64];
+        snprintf(item, sizeof(item), "%s%s %d", all.empty() ? "" : ", ", *(const char* const*)e, **(int* const*)(e + 4));
+        all += item;
+    }
+    ft::Log("graphics: %s", all.c_str());
+}
+
+void ReadGraphicsIni(const ft::Ini& ini) {
+    g_graphicsProfile = ini.String("Graphics", "Profile");
+    g_graphicsIni.preset = ini.Int("Graphics", "Preset", -1);
+    for (const uint8_t* e = (const uint8_t*)kVideoOptions; IsVideoOption(e); e += 12) {
+        const char* name = *(const char* const*)e;
+        char text[32] = {};
+        GetPrivateProfileStringA("Graphics", name, "", text, sizeof(text), ini.path.c_str());
+        if (text[0]) g_graphicsIni.options.emplace_back(name, (int)strtol(text, nullptr, 0));
+    }
+}
+
+// ---- music (see "Free roam" at the top of the file)
+
+// every frame of a free roam: the music volume back to 0 should anything set it, handed to the voices in gameplay
+void HoldMusicOff() {
+    volatile float* music = (volatile float*)kMusicVolume;
+    if (*music != 0.0f) {
+        static int logged = 0;
+        if (logged++ < 3) ft::Log("free roam: music volume %.2f -> 0", *music);
+        *music = 0.0f;
+        g_musicMuted = false;
+    }
+    if (g_musicMuted || *(volatile int*)kGameFlowState != kFlowRacing) return;
+    g_musicMuted = true;
+    uint8_t* world = *(uint8_t* volatile*)kAudioWorld;
+    if (!world || !ft::Matches(kApplyVolumes, kApplyVolumesStart, sizeof(kApplyVolumesStart))) return;
+    *(uintptr_t*)(world + 8) = kVolumes;   // as each caller of 0x51CC10 does
+    ((void(__stdcall*)(void*))kApplyVolumes)(world);
+    ft::Log("free roam: music volume 0 handed to the voices");
 }
 
 void PlaceCar(void* car, float* position, int angle) {
@@ -272,6 +476,97 @@ HANDLE WINAPI CreateFileAHook(LPCSTR name, DWORD access, DWORD share, LPSECURITY
     return g_createFileA(name, access, share, security, how, flags, templ);
 }
 
+// The same for CreateFileW -- the one the game really uses: its file system (0x5C7FB9) turns the name into UTF-16
+// and opens it with CreateFileW, falling back to CreateFileA only when that conversion fails.
+using CreateFileWFn = HANDLE(WINAPI*)(LPCWSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
+CreateFileWFn g_createFileW = nullptr;
+volatile LONG g_bundleRedirects = 0;
+
+HANDLE WINAPI CreateFileWHook(LPCWSTR name, DWORD access, DWORD share, LPSECURITY_ATTRIBUTES security, DWORD how,
+                              DWORD flags, HANDLE templ) {
+    if (g_freeRoam && name) {
+        const wchar_t* file = wcsrchr(name, L'\\');
+        const wchar_t* slash = wcsrchr(name, L'/');
+        if (slash > file) file = slash;
+        file = file ? file + 1 : name;
+        if (_wcsnicmp(file, L"TRACKB", 6) == 0) {
+            const std::string folder = GameFolder();
+            const std::wstring mine = std::wstring(folder.begin(), folder.end()) + L"\\models\\freeroam\\" + file;
+            if (GetFileAttributesW(mine.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                const HANDLE handle = g_createFileW(mine.c_str(), access, share, security, how, flags, templ);
+                if (handle != INVALID_HANDLE_VALUE) {
+                    InterlockedIncrement(&g_bundleRedirects);   // logged from the frame: no file work in here
+                    return handle;
+                }
+            }
+        }
+    }
+    return g_createFileW(name, access, share, security, how, flags, templ);
+}
+
+// Hooking the import table is not enough: a plugin loaded after this one (one that moves the user files, say)
+// writes its own hook over the CreateFileW entry and calls the system's function, not what it found there. So the
+// game's file system is taken at its two calls -- 0x5C7FDC (call [0x6971C4], CreateFileW) and 0x5C7FF7 (call
+// [0x6971C0], CreateFileA) -- and the track bundle's name changed there; the call then goes on through whatever
+// the import table holds by then, every other plugin's hook included.
+HANDLE WINAPI FileSystemCreateFileW(LPCWSTR name, DWORD access, DWORD share, LPSECURITY_ATTRIBUTES security,
+                                    DWORD how, DWORD flags, HANDLE templ) {
+    const auto next = *(CreateFileWFn volatile*)kImportCreateFileW;
+    if (g_freeRoam && name) {
+        const wchar_t* file = wcsrchr(name, L'\\');
+        const wchar_t* slash = wcsrchr(name, L'/');
+        if (slash > file) file = slash;
+        file = file ? file + 1 : name;
+        if (_wcsnicmp(file, L"TRACKB", 6) == 0) {
+            const std::string folder = GameFolder();
+            const std::wstring mine = std::wstring(folder.begin(), folder.end()) + L"\\models\\freeroam\\" + file;
+            if (GetFileAttributesW(mine.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                const HANDLE handle = next(mine.c_str(), access, share, security, how, flags, templ);
+                if (handle != INVALID_HANDLE_VALUE) {
+                    InterlockedIncrement(&g_bundleRedirects);
+                    return handle;
+                }
+            }
+        }
+    }
+    return next(name, access, share, security, how, flags, templ);
+}
+
+HANDLE WINAPI FileSystemCreateFileA(LPCSTR name, DWORD access, DWORD share, LPSECURITY_ATTRIBUTES security,
+                                    DWORD how, DWORD flags, HANDLE templ) {
+    const auto next = *(CreateFileAFn volatile*)kImportCreateFileA;
+    if (g_freeRoam && name) {
+        const char* file = strrchr(name, '\\');
+        const char* slash = strrchr(name, '/');
+        if (slash > file) file = slash;
+        file = file ? file + 1 : name;
+        if (_strnicmp(file, "TRACKB", 6) == 0) {
+            const std::string mine = GameFolder() + "\\models\\freeroam\\" + file;
+            if (GetFileAttributesA(mine.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                const HANDLE handle = next(mine.c_str(), access, share, security, how, flags, templ);
+                if (handle != INVALID_HANDLE_VALUE) {
+                    InterlockedIncrement(&g_bundleRedirects);
+                    return handle;
+                }
+            }
+        }
+    }
+    return next(name, access, share, security, how, flags, templ);
+}
+
+// "call dword ptr [import]" (FF 15 imm32, six bytes) made "call hook; nop".
+bool TakeImportCall(uintptr_t site, uintptr_t import, void* hook) {
+    uint8_t expected[6] = { 0xFF, 0x15 };
+    std::memcpy(expected + 2, &import, 4);
+    if (!ft::Matches(site, expected, sizeof(expected))) return false;
+    uint8_t code[6] = { 0xE8 };
+    const int32_t rel = (int32_t)((uintptr_t)hook - (site + 5));
+    std::memcpy(code + 1, &rel, 4);
+    code[5] = 0x90;
+    ft::Write(site, code, sizeof(code));
+    return true;
+}
+
 // 0x448440 for the pre-race: GLOBAL\PRERACEANIM.LZC is "not loaded" in a free roam
 // the call at 0x409EF0 (stdcall, the player's map view): no track map in a free roam
 __declspec(naked) void TrackMapStub() {
@@ -289,9 +584,22 @@ int __cdecl PreRaceAnimLoaded(const char* name) {
 }
 
 void __cdecl LaunchPoseFrame() {
-    if (g_freeRoam && *(volatile int*)kGameFlowState != kFlowRacing) {
+    static LONG redirectsLogged = 0;
+    if (g_bundleRedirects != redirectsLogged) {
+        redirectsLogged = g_bundleRedirects;
+        ft::Log("free roam: the track bundle was opened from models\\freeroam (%ld times)", redirectsLogged);
+    }
+    // In gameplay too: BayviewU1 writes its value back as a track loads, and
+    // the countdown takes it when the pre-race starts it, in gameplay.
+    if (g_freeRoam) {
+        HoldMusicOff();
         static const float fast[2] = {0.01f, 0.01f};
         if (memcmp((const void*)kCountdown, fast, sizeof fast) != 0) ft::Write(kCountdown, fast, sizeof fast);
+        // The race's start object ([0x736194]) took its length of each count (+0xC) from there when it was
+        // set up, which can be before this ran; 0x434D10 compares the time since the count began with it.
+        uint8_t* start = *(uint8_t* volatile*)kRaceStart;
+        if (start && !IsBadWritePtr(start + 0xC, 4) && *(volatile float*)(start + 0xC) > 0.01f)
+            *(volatile float*)(start + 0xC) = 0.01f;
     }
     // Esc closes the game, in front only (an Esc in the editor is the editor's)
     static bool escDown = false;
@@ -340,13 +648,23 @@ void InstallFreeRoam() {
     const uint32_t skip = kFlybySkip;
     ft::Write(tick, &skip, 4);
     ft::WriteBranch(kPreRaceAnimCall, (void*)&PreRaceAnimLoaded, 0xE8);
+    // The start NIS (the W sections' cut-scene at the start line): the
+    // pre-race's tick waits for it to end; its skip starts the countdown and
+    // the race at once. The tick is pointed at the skip, as the fly-by's.
+    const uintptr_t preRaceTick = kPreRaceJumpTable + 2 * 4;
+    if (*(const uint32_t*)preRaceTick == kPreRaceTick && *(const uint32_t*)(kPreRaceJumpTable + 3 * 4) == kPreRaceSkip) {
+        const uint32_t preRaceSkip = kPreRaceSkip;
+        ft::Write(preRaceTick, &preRaceSkip, 4);
+    } else {
+        ft::Log("free roam: the pre-race's handlers differ from v1.4 (another mod?): the start cut-scene stays");
+    }
     if (*(const uint8_t*)kTrackMapCall == 0xE8) {
         g_trackMapNext = ft::CallTarget(kTrackMapCall);
         ft::WriteBranch(kTrackMapCall, (void*)&TrackMapStub, 0xE8);
     } else {
         ft::Log("free roam: 0x409EF0 is not a call (another mod?): the track map stays");
     }
-    ft::Log("free roam: no fly-by, no pre-race animation, a 0.01 s countdown, no track map; Esc closes the game");
+    ft::Log("free roam: no fly-by, no pre-race animation or cut-scene, a 0.01 s countdown, no track map; Esc closes the game");
 
     // the race furniture's scenery: whatever slot 12 holds is called after
     if (!g_hide.empty()) {
@@ -357,9 +675,14 @@ void InstallFreeRoam() {
     }
     // the free roam's track bundle, when the editor wrote one
     g_createFileA = (CreateFileAFn)ft::HookImport("KERNEL32.dll", "CreateFileA", (void*)&CreateFileAHook);
+    g_createFileW = (CreateFileWFn)ft::HookImport("KERNEL32.dll", "CreateFileW", (void*)&CreateFileWHook);
+    const bool takenW = TakeImportCall(kFileSystemCreateW, kImportCreateFileW, (void*)&FileSystemCreateFileW);
+    const bool takenA = TakeImportCall(kFileSystemCreateA, kImportCreateFileA, (void*)&FileSystemCreateFileA);
+    ft::Log("free roam: the game's file system calls taken: CreateFileW %s, CreateFileA %s", takenW ? "yes" : "NO",
+            takenA ? "yes" : "NO");
     const std::string bundle = GameFolder() + "\\models\\freeroam\\TRACKB" + std::to_string(g_track) + ".LZC";
-    if (!g_createFileA)
-        ft::Log("free roam: CreateFileA is hooked by something else already: the track's own collision is used");
+    if (!g_createFileW && !takenW)
+        ft::Log("free roam: CreateFileW is hooked by something else already: the track's own collision is used");
     else if (GetFileAttributesA(bundle.c_str()) != INVALID_FILE_ATTRIBUTES)
         ft::Log("free roam: the collision of the editor's %s (every track of the region, no race barriers)",
                 bundle.c_str());
@@ -387,6 +710,7 @@ void InstallLaunchPose() {
 
 // 0x4B6390 with the [FastTest] settings in place of the boot's
 void __cdecl StartSkipFE() {
+    ApplyGraphics();
     if (g_track > 0) {
         const uint8_t* tracks = *(const uint8_t**)kTrackList;
         const int count = *(int*)kTrackCount;
@@ -489,6 +813,7 @@ void Start() {
     g_laps = ini.Int("FastTest", "Laps", 0);
     g_aiCars = ini.Int("FastTest", "AICars", -1);
     g_car = ini.String("FastTest", "Car");
+    ReadGraphicsIni(ini);
     InstallLaunchPose();   // may name the track: the editor's region
     for (char& c : g_car) c = (char)toupper((uint8_t)c);
     if (ft::IsCallTo(kSkipFEStartCall, kSkipFEStart)) ft::WriteBranch(kSkipFEStartCall, (void*)&StartSkipFE);

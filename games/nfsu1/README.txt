@@ -3,7 +3,8 @@ FRSFastTest
 
 For Need for Speed Underground: the game boots straight into a race, through
 the developers' own quick start (SkipFE) still inside the game. No intro, no
-menus, no save loaded. Meant for modders who restart the game often.
+menus, no save loaded (the graphics settings still come from your
+profile). Meant for modders who restart the game often.
 
 
 INSTALL
@@ -37,6 +38,13 @@ SETTINGS  (scripts\FRSFastTest.ini)
     Width=0          resolution for this session only (0 = game setting)
     Height=0
     Background=0     1 = never take the focus, keep running without it
+    [Graphics]
+    Profile=         the profile whose graphics settings are used
+                     (empty = the one saved last, - = none: the game's
+                     own hardware guess, which picks the lowest today)
+    Preset=-1        0..3, the game's performance presets (-1 = none)
+    WorldLOD=3       any option of the profile's .cfg, over the others
+                     (ENVMAP, SHADOW, ROADREFLECTION, CarLOD, ...)
 
 
 The race is always a lap race: the quick start cannot set the race type, so
