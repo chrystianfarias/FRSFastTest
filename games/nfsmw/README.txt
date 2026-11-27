@@ -1,9 +1,8 @@
 FRSFastTest
 ===========
 
-For Need for Speed Most Wanted: the game boots straight into a race, through
-the developers' own quick start (SkipFE) still inside the game. No intro, no
-menus, no save loaded. Meant for modders who restart the game often.
+For Need for Speed Most Wanted. Boot straight into a race through SkipFE,
+or into free roam from an existing career save.
 
 
 INSTALL
@@ -24,6 +23,7 @@ SETTINGS  (scripts\FRSFastTest.ini)
 
     [FastTest]
     Enabled=1        0 = the game starts as usual
+    Mode=race        race = configured race, career = free roam from a save
     Car=             car model, e.g. bmwm3gtre46, 911turbo, gti, murcielago
     Track=0          track number (0 = the default, 2000)
     Laps=0           laps (0 = the default, 2)
