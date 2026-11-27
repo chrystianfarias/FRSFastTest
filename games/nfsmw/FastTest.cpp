@@ -1,5 +1,5 @@
 // FRSFastTest for Need for Speed Most Wanted (speed.exe v1.3): boots straight into a race through the
-// developers' SkipFE switch.
+// developers' SkipFE switch, or into career free roam from an existing save.
 //
 // The option parser (0x78A900, "SKIPFE", "SKIPFEPLAYERCAR", ...) is never fed in the retail build, but the globals
 // it writes are still read:
@@ -36,6 +36,115 @@ constexpr uintptr_t kParserSkipFEAt = 0x78A928;
 ft::WindowOptions g_window;
 std::string g_car;
 bool g_aiControl = false;
+
+constexpr int kFlowFrontEnd = 3;
+constexpr UINT kCareerMessage = WM_APP + 0x53;
+WNDPROC g_previousWndProc = nullptr;
+volatile LONG g_careerStarted = 0;
+
+HWND FocusGameWindow() {
+    HWND game = nullptr;
+    EnumWindows([](HWND hwnd, LPARAM out) -> BOOL {
+        DWORD pid = 0;
+        GetWindowThreadProcessId(hwnd, &pid);
+        if (pid != GetCurrentProcessId()) return TRUE;
+        char name[64]{};
+        GetClassNameA(hwnd, name, sizeof name);
+        if (std::strcmp(name, "GameFrame") != 0) return TRUE;
+        ShowWindow(hwnd, SW_RESTORE);
+        BringWindowToTop(hwnd);
+        const DWORD thread = GetWindowThreadProcessId(GetForegroundWindow(), nullptr);
+        const DWORD self = GetCurrentThreadId();
+        const bool attached = thread && thread != self && AttachThreadInput(self, thread, TRUE);
+        SetForegroundWindow(hwnd);
+        if (attached) AttachThreadInput(self, thread, FALSE);
+        *reinterpret_cast<HWND*>(out) = hwnd;
+        return FALSE;
+    }, reinterpret_cast<LPARAM>(&game));
+    return game;
+}
+
+// The native career handoff has to run on the game's window thread.
+LRESULT CALLBACK CareerWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == kCareerMessage) {
+        reinterpret_cast<void(*)()>(0x56C530)();
+        InterlockedExchange(&g_careerStarted, 1);
+        return 0;
+    }
+    return CallWindowProcW(g_previousWndProc, hwnd, message, wParam, lParam);
+}
+
+DWORD WINAPI EnterCareer(LPVOID) {
+    HWND window = nullptr;
+    const DWORD started = GetTickCount();
+    DWORD frontEndSince = 0, lastFocus = started;
+    bool ready = false;
+    while (GetTickCount() - started < 180000) {
+        const int flow = *reinterpret_cast<const volatile int*>(kGameFlowState);
+        if (flow == kFlowRacing) return 0;
+        const DWORD now = GetTickCount();
+        if (!window || now - lastFocus >= 1000) {
+            window = FocusGameWindow();
+            lastFocus = now;
+        }
+        if (flow != kFlowFrontEnd) frontEndSince = 0;
+        else if (!frontEndSince) frontEndSince = now;
+        else if (window && now - frontEndSince >= 5500) {
+            ready = true;
+            break;
+        }
+        Sleep(100);
+    }
+    if (!ready) {
+        ft::Log("career: front end did not become ready");
+        return 0;
+    }
+    g_previousWndProc = reinterpret_cast<WNDPROC>(GetWindowLongPtrW(window, GWLP_WNDPROC));
+    if (!g_previousWndProc ||
+        !SetWindowLongPtrW(window, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&CareerWindowProc))) {
+        ft::Log("career: could not reach the game window thread");
+        return 0;
+    }
+
+    DWORD_PTR reply = 0;
+    const bool sent = SendMessageTimeoutW(window, kCareerMessage, 0, 0,
+                                          SMTO_ABORTIFHUNG | SMTO_BLOCK, 10000, &reply) != 0;
+    if (GetWindowLongPtrW(window, GWLP_WNDPROC) == reinterpret_cast<LONG_PTR>(&CareerWindowProc))
+        SetWindowLongPtrW(window, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(g_previousWndProc));
+    if (!sent || !InterlockedCompareExchange(&g_careerStarted, 0, 0)) {
+        ft::Log("career: game did not enter the career");
+        return 0;
+    }
+
+    const DWORD loading = GetTickCount();
+    lastFocus = loading;
+    while (GetTickCount() - loading < 120000) {
+        if (*reinterpret_cast<const volatile int*>(kGameFlowState) == kFlowRacing) {
+            ft::Log("career: free roam ready");
+            return 0;
+        }
+        if (GetTickCount() - lastFocus >= 1000) {
+            FocusGameWindow();
+            lastFocus = GetTickCount();
+        }
+        Sleep(100);
+    }
+    ft::Log("career: free roam load timed out");
+    return 0;
+}
+
+bool EditorCareerLaunch() {
+    char value[2]{};
+    return GetEnvironmentVariableA("FRS_MW_FASTTEST_CAREER", value, sizeof value) == 1 && value[0] == '1';
+}
+
+bool SupportedGame() {
+    unsigned char bytes[sizeof kParserSkipFE]{};
+    SIZE_T read = 0;
+    return ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<const void*>(kParserSkipFEAt),
+                             bytes, sizeof bytes, &read) && read == sizeof bytes &&
+           std::memcmp(bytes, kParserSkipFE, sizeof bytes) == 0;
+}
 
 void __fastcall GetResolutionHook(void* self, void*, int* w, int* h) {
     ((void(__thiscall*)(void*, int*, int*))kGetResolution)(self, w, h);
@@ -89,12 +198,22 @@ DWORD WINAPI Watch(LPVOID) {
 void Start() {
     ft::OpenLog();
     const ft::Ini ini{ft::BesidePlugin(".ini")};
-    if (!ini.Bool("FastTest", "Enabled", true)) {
+    const bool editorCareer = EditorCareerLaunch();
+    if (!editorCareer && !ini.Bool("FastTest", "Enabled", true)) {
         ft::Log("disabled");
         return;
     }
-    if (!ft::Matches(kParserSkipFEAt, kParserSkipFE, sizeof(kParserSkipFE))) {
+    if (!SupportedGame()) {
         ft::Log("not speed.exe v1.3: nothing done");
+        return;
+    }
+    const auto mode = ini.String("FastTest", "Mode", "race");
+    if (editorCareer || _stricmp(mode.c_str(), "career") == 0) {
+        if (HANDLE thread = CreateThread(nullptr, 0, EnterCareer, nullptr, 0, nullptr)) CloseHandle(thread);
+        return;
+    }
+    if (_stricmp(mode.c_str(), "race") != 0) {
+        ft::Log("unknown mode: %s", mode.c_str());
         return;
     }
     ft::WriteValue<int>(kSkipFE, 1);
